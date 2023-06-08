@@ -121,16 +121,28 @@ int main(void)
   rs485_config();
   
   len = sizeof(str);
-  rs485_send_data((u8*)str, len);
+	if (0) {
+		while (1) {
+			rs485_send_data((u8*)str, len);
+			delay_sec(1);
+		}	
+	} else {
+		rs485_send_data((u8*)str, len);
+	}
+
+
   while(1)
   {
+		cur_flag = USART2->sts;
+		//rs485_send_data((u8*)str, len);
+
     if(usart_flag_get(USART2, USART_IDLEF_FLAG) != RESET)
     {
-      usart_data_receive(USART2);
+      uint16_t ch = usart_data_receive(USART2);
       usart_interrupt_enable(USART2, USART_RDBF_INT, FALSE);
       rs485_send_data(rs485_buffer_rx, rs485_buffer_rx_cnt);
       rs485_buffer_rx_cnt = 0;
-      usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
+      //usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
     }  
   }
 }
@@ -142,6 +154,9 @@ int main(void)
   */
 void USART2_IRQHandler(void)
 {
+	char str[]="push button..\r\n";
+  u8 len = sizeof(str);
+	
   uint16_t tmp;
   
   if(usart_flag_get(USART2, USART_RDBF_FLAG) != RESET)
