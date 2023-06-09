@@ -33,17 +33,13 @@
   * @{
   */
 
-#define RS485_BAUDRATE                       9600
-#define RS485_BUFFER_SIZE                    128
+#define RS485_BAUDRATE                       115200
+#define RS485_BUFFER_SIZE                    16
 
 uint8_t rs485_buffer_rx[RS485_BUFFER_SIZE];
-uint8_t rs485_buffer_rx_cnt = 0;                                       
+uint8_t rs485_buffer_rx_cnt = 0; 
+uint32_t counter = 0;
 
-/**
-  *  @brief  rs485 configiguration.
-  *  @param  none
-  *  @retval none
-  */
 static void rs485_config(void)
 {
   gpio_init_type gpio_init_struct;
@@ -79,7 +75,8 @@ static void rs485_config(void)
   
   usart_flag_clear(USART2, USART_RDBF_FLAG);
   usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
-  
+  //usart_interrupt_enable(USART2, USART_IDLE_INT, TRUE);
+	//usart_hardware_flow_control_set(USART2, USART_HARDWARE_FLOW_RTS_CTS );
   usart_receiver_enable(USART2, TRUE);
   usart_transmitter_enable(USART2, TRUE);
   usart_enable(USART2, TRUE);
@@ -87,12 +84,7 @@ static void rs485_config(void)
   nvic_irq_enable(USART2_IRQn, 1, 0);
 }
 
-/**
-  *  @brief  rs485 send data
-  *  @param  buf: pointer to the buffer that contain the data to be transferred.
-  *  @param  cnt: size of buffer in bytes.
-  *  @retval none
-  */
+
 static void rs485_send_data(u8* buf, u8 cnt)
 {
   gpio_bits_set(GPIOA, GPIO_PINS_1);
@@ -104,11 +96,6 @@ static void rs485_send_data(u8* buf, u8 cnt)
   gpio_bits_reset(GPIOA, GPIO_PINS_1);
 }
 
-/**
-  * @brief  main function.
-  * @param  none
-  * @retval none
-  */
 int main(void)
 {
   char str[]="start test..\r\n";
@@ -118,6 +105,8 @@ int main(void)
   at32_board_init();
   nvic_priority_group_config(NVIC_PRIORITY_GROUP_4);
   
+	uart_print_init(115200);
+
   rs485_config();
   
   len = sizeof(str);
@@ -127,38 +116,29 @@ int main(void)
 			delay_sec(1);
 		}	
 	} else {
+		//gpio_bits_reset(GPIOA, GPIO_PINS_1);
+
 		rs485_send_data((u8*)str, len);
 	}
 
-
   while(1)
   {
-		cur_flag = USART2->sts;
-		//rs485_send_data((u8*)str, len);
-
     if(usart_flag_get(USART2, USART_IDLEF_FLAG) != RESET)
     {
-      uint16_t ch = usart_data_receive(USART2);
+      usart_data_receive(USART2);
       usart_interrupt_enable(USART2, USART_RDBF_INT, FALSE);
       rs485_send_data(rs485_buffer_rx, rs485_buffer_rx_cnt);
       rs485_buffer_rx_cnt = 0;
-      //usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
+      usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
     }  
   }
 }
 
-/**
-  * @brief  usart2 interrupt handler
-  * @param  none
-  * @retval none
-  */
 void USART2_IRQHandler(void)
 {
-	char str[]="push button..\r\n";
-  u8 len = sizeof(str);
-	
   uint16_t tmp;
-  
+	//flag = usart_flag_get(USART2, USART_IDLE_INT);
+
   if(usart_flag_get(USART2, USART_RDBF_FLAG) != RESET)
   {
     tmp = usart_data_receive(USART2);
@@ -166,13 +146,60 @@ void USART2_IRQHandler(void)
     {
       rs485_buffer_rx[rs485_buffer_rx_cnt++] = tmp;
     }
-  }
+		//if (tmp == 'a') {
+		//}
+  } 
+	if(usart_flag_get(USART2, USART_PERR_FLAG) != RESET)
+	{
+		printf("PERR\r\n");
+	}
+  if(usart_flag_get(USART2, USART_ROERR_FLAG) != RESET)
+	{
+		printf("ROERR\r\n");
+	}  
+	if(usart_flag_get(USART2, USART_FERR_FLAG) != RESET)
+	{
+		printf("FERR\r\n");
+	}
+  if(usart_flag_get(USART2, USART_NERR_FLAG) != RESET)
+	{
+		printf("NERR\r\n");
+	}  
+	if(usart_flag_get(USART2, USART_IDLEF_FLAG) != RESET)
+	{
+		printf("IDLEF\r\n");
+	}
+	if(usart_flag_get(USART2, USART_TDC_FLAG) != RESET)
+	{
+		printf("TDC\r\n");
+	}
+  if(usart_flag_get(USART2, USART_TDBE_FLAG) != RESET)
+	{
+		printf("TDBE\r\n");
+	}
+  if(usart_flag_get(USART2, USART_BFF_FLAG) != RESET)
+	{
+		printf("BFF\r\n");
+	}
+  if(usart_flag_get(USART2, USART_CTSCF_FLAG) != RESET)
+	{
+		printf("CTSCF\r\n");
+	}
+
+
+		//printf("%c,\t%i,\t%i", tmp, (uint8_t)tmp & 0x00FF, (uint8_t)((tmp & 0xFFFF)>>8));
+	printf("%i\r\n\r\n", counter);
+//	if (rs485_buffer_rx_cnt < 4) {
+//		int flag = usart_flag_get(USART2, USART_RDBF_FLAG);
+//		rs485_buffer_rx[rs485_buffer_rx_cnt] = 0;
+//		printf("%i\tRDBF=%i\t%s",counter, flag, rs485_buffer_rx); 
+//		printf("\r\n"); 
+//     //usart_data_receive(USART2);
+//      usart_interrupt_enable(USART2, USART_RDBF_INT, FALSE);
+//      rs485_send_data(rs485_buffer_rx, rs485_buffer_rx_cnt);
+//      rs485_buffer_rx_cnt = 0;
+//      usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);	
+		counter++;
+//	}
+
 }
-
-/**
-  * @}
-  */ 
-
-/**
-  * @}
-  */ 
