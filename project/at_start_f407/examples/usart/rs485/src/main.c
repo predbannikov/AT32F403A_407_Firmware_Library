@@ -34,7 +34,7 @@
   */
 
 #define RS485_BAUDRATE                       115200
-#define RS485_BUFFER_SIZE                    16
+#define RS485_BUFFER_SIZE                    8
 
 uint8_t rs485_buffer_rx[RS485_BUFFER_SIZE];
 uint8_t rs485_buffer_rx_cnt = 0; 
@@ -72,7 +72,8 @@ static void rs485_config(void)
   
   /* configure uart2 param */
   usart_init(USART2, RS485_BAUDRATE, USART_DATA_8BITS, USART_STOP_1_BIT);
-  
+  usart_parity_selection_config(USART2, USART_PARITY_NONE);
+	//usart_hardware_flow_control_set(USART2, USART_HARDWARE_FLOW_RTS);
   usart_flag_clear(USART2, USART_RDBF_FLAG);
   usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
   //usart_interrupt_enable(USART2, USART_IDLE_INT, TRUE);
@@ -90,7 +91,10 @@ static void rs485_send_data(u8* buf, u8 cnt)
   gpio_bits_set(GPIOA, GPIO_PINS_1);
   while(cnt--){
     while(usart_flag_get(USART2, USART_TDBE_FLAG) == RESET);
-    usart_data_transmit(USART2, *buf++);
+		char ch = *buf++;
+		if(!ch)
+			continue;
+    usart_data_transmit(USART2, ch);
   }
   while(usart_flag_get(USART2, USART_TDC_FLAG) == RESET);
   gpio_bits_reset(GPIOA, GPIO_PINS_1);
@@ -118,19 +122,27 @@ int main(void)
 	} else {
 		//gpio_bits_reset(GPIOA, GPIO_PINS_1);
 
-		rs485_send_data((u8*)str, len);
+		//rs485_send_data((u8*)str, len);
 	}
 
   while(1)
   {
-    if(usart_flag_get(USART2, USART_IDLEF_FLAG) != RESET)
+    //if(usart_flag_get(USART2, USART_IDLEF_FLAG) != RESET)
+    //{
+    //  usart_data_receive(USART2);
+    //  usart_interrupt_enable(USART2, USART_RDBF_INT, FALSE);
+    //  rs485_send_data(rs485_buffer_rx, rs485_buffer_rx_cnt);
+    //  rs485_buffer_rx_cnt = 0;
+    //  usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
+    //}  
+    if(rs485_buffer_rx_cnt >= RS485_BUFFER_SIZE)
     {
-      usart_data_receive(USART2);
+      //usart_data_receive(USART2);
       usart_interrupt_enable(USART2, USART_RDBF_INT, FALSE);
       rs485_send_data(rs485_buffer_rx, rs485_buffer_rx_cnt);
       rs485_buffer_rx_cnt = 0;
       usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
-    }  
+    }
   }
 }
 
@@ -138,57 +150,78 @@ void USART2_IRQHandler(void)
 {
   uint16_t tmp;
 	//flag = usart_flag_get(USART2, USART_IDLE_INT);
-
+	//while(usart_flag_get(USART3, USART_RDBF_FLAG) == RESET);
+	//printf("start");
   if(usart_flag_get(USART2, USART_RDBF_FLAG) != RESET)
   {
     tmp = usart_data_receive(USART2);
-    if(rs485_buffer_rx_cnt < RS485_BUFFER_SIZE)
+    if(rs485_buffer_rx_cnt < RS485_BUFFER_SIZE && tmp != 0)
     {
       rs485_buffer_rx[rs485_buffer_rx_cnt++] = tmp;
-    }
-		//if (tmp == 'a') {
-		//}
-  } 
-	if(usart_flag_get(USART2, USART_PERR_FLAG) != RESET)
-	{
-		printf("PERR\r\n");
-	}
-  if(usart_flag_get(USART2, USART_ROERR_FLAG) != RESET)
-	{
-		printf("ROERR\r\n");
-	}  
-	if(usart_flag_get(USART2, USART_FERR_FLAG) != RESET)
-	{
-		printf("FERR\r\n");
-	}
-  if(usart_flag_get(USART2, USART_NERR_FLAG) != RESET)
-	{
-		printf("NERR\r\n");
-	}  
-	if(usart_flag_get(USART2, USART_IDLEF_FLAG) != RESET)
-	{
-		printf("IDLEF\r\n");
-	}
-	if(usart_flag_get(USART2, USART_TDC_FLAG) != RESET)
-	{
-		printf("TDC\r\n");
-	}
-  if(usart_flag_get(USART2, USART_TDBE_FLAG) != RESET)
-	{
-		printf("TDBE\r\n");
-	}
-  if(usart_flag_get(USART2, USART_BFF_FLAG) != RESET)
-	{
-		printf("BFF\r\n");
-	}
-  if(usart_flag_get(USART2, USART_CTSCF_FLAG) != RESET)
-	{
-		printf("CTSCF\r\n");
-	}
+			//char ch = tmp;
+			//printf(">%c\r\n", ch);
+			//printf("0x%08x\r\n", tmp);
+			//usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
 
+    }
+  } else {
+		//printf("test");
+	}
+	//if(usart_flag_get(USART2, USART_RDBF_FLAG) != RESET)
+	//{
+	//	printf("-RDBF\r\n");
+	//}
+
+	//if(usart_flag_get(USART2, USART_PERR_FLAG) != RESET)
+	//{
+	//	printf("PERR\r\n");
+	//}
+  //if(usart_flag_get(USART2, USART_ROERR_FLAG) != RESET)
+	//{
+	//	printf("ROERR\r\n");
+	//}  
+	//if(usart_flag_get(USART2, USART_FERR_FLAG) != RESET)
+	//{
+	//	printf("FERR\r\n");
+	//}
+  //if(usart_flag_get(USART2, USART_NERR_FLAG) != RESET)
+	//{
+	//	printf("NERR\r\n");
+	//}  
+	//if(usart_flag_get(USART2, USART_IDLEF_FLAG) != RESET)
+	//{
+	//	printf("IDLEF\r\n");
+	//}
+	//if(usart_flag_get(USART2, USART_TDC_FLAG) != RESET)
+	//{
+	//	printf("TDC\r\n");
+	//}
+  //if(usart_flag_get(USART2, USART_TDBE_FLAG) != RESET)
+	//{
+	//	printf("TDBE\r\n");
+	//}
+  //if(usart_flag_get(USART2, USART_BFF_FLAG) != RESET)
+	//{
+	//	printf("BFF\r\n");
+	//}
+  //if(usart_flag_get(USART2, USART_CTSCF_FLAG) != RESET)
+	//{
+	//	printf("CTSCF\r\n");
+	//}
+
+	//if (gpio_output_data_bit_read(USART2, GPIO_PINS_1))
+	//{
+	//	printf("set");
+	//} else {
+	//	printf("reset");
+	//	usart_interrupt_enable(USART2, USART_RDBF_INT, FALSE);
+	//  rs485_send_data(rs485_buffer_rx, rs485_buffer_rx_cnt);
+  //  rs485_buffer_rx_cnt = 0;
+  //  usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);
+	//}
 
 		//printf("%c,\t%i,\t%i", tmp, (uint8_t)tmp & 0x00FF, (uint8_t)((tmp & 0xFFFF)>>8));
-	printf("%i\r\n\r\n", counter);
+	//printf("%i \r\n\r\n", counter);
 //	if (rs485_buffer_rx_cnt < 4) {
 //		int flag = usart_flag_get(USART2, USART_RDBF_FLAG);
 //		rs485_buffer_rx[rs485_buffer_rx_cnt] = 0;
@@ -199,7 +232,7 @@ void USART2_IRQHandler(void)
 //      rs485_send_data(rs485_buffer_rx, rs485_buffer_rx_cnt);
 //      rs485_buffer_rx_cnt = 0;
 //      usart_interrupt_enable(USART2, USART_RDBF_INT, TRUE);	
-		counter++;
+//		counter++;
 //	}
 
 }
